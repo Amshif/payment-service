@@ -1,0 +1,32 @@
+# Byte-compiled / Python artifacts
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Virtual environments
+.venv/
+env/
+venv/
+ENV/
+
+# Poetry
+.poetry/        # optional, not needed usually
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# IDE / editor settings
+.vscode/
+.idea/
+*.sublime-project
+*.sublime-workspace
+
+# Logs / temporary files
+*.log
+*.sqlite3
+*.pyc
+
+# Secrets / env files
+.env
+.env.*           # sometimes multiple env files per environment
