@@ -12,8 +12,8 @@ class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file='.env', env_file_encoding='utf-8')
 
 APP_CONFIG = dict(
-    title="Smart Shopping List",
-    description="API for managing a smart shopping list application.",
+    title="payment backend",
+    description="API for managing a payment backend application.",
     version="1.0.0"
 )
 
