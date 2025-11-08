@@ -1,45 +1,22 @@
 -- ================================
 -- ENUM DEFINITIONS
 -- ================================
-CREATE TYPE order_status AS ENUM ('created', 'paid', 'partially_paid', 'failed', 'cancelled', 'refunded');
 CREATE TYPE payment_status AS ENUM ('created', 'authorized', 'captured', 'failed', 'refunded', 'disputed');
 CREATE TYPE refund_status AS ENUM ('created', 'processed', 'failed');
 CREATE TYPE settlement_status AS ENUM ('pending', 'settled', 'failed');
 CREATE TYPE actor_type AS ENUM ('system', 'user', 'admin');
-CREATE TYPE user_role AS ENUM ('user', 'admin', 'support');
 
 -- ================================
--- USERS
+-- IDEMPOTENCY KEYS
 -- ================================
-CREATE EXTENSION IF NOT EXISTS citext;
-
-CREATE TABLE users (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  email CITEXT UNIQUE NOT NULL,
-  phone VARCHAR(20),
-  name VARCHAR(255),
-  role user_role NOT NULL DEFAULT 'user',
-  is_active BOOLEAN DEFAULT true,
-  metadata JSONB DEFAULT '{}'::jsonb,
+CREATE TABLE idempotency_keys (
+  key TEXT PRIMARY KEY,
+  request_path TEXT NOT NULL,
+  request_method TEXT NOT NULL,
+  response_status INT,
+  response_body JSONB,
   created_at TIMESTAMPTZ DEFAULT now(),
-  updated_at TIMESTAMPTZ DEFAULT now()
-);
-
--- ================================
--- ORDERS
--- ================================
-CREATE TABLE orders (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  external_order_id VARCHAR(128) UNIQUE NOT NULL,
-  user_id UUID REFERENCES users(id) ON DELETE SET NULL,
-  amount BIGINT NOT NULL CHECK (amount > 0),
-  currency CHAR(3) NOT NULL DEFAULT 'INR',
-  status order_status NOT NULL DEFAULT 'created',
-  razorpay_order_id VARCHAR(128) UNIQUE,
-  description TEXT,
-  metadata JSONB DEFAULT '{}'::jsonb,
-  created_at TIMESTAMPTZ DEFAULT now(),
-  updated_at TIMESTAMPTZ DEFAULT now()
+  expires_at TIMESTAMPTZ
 );
 
 -- ================================
@@ -47,8 +24,9 @@ CREATE TABLE orders (
 -- ================================
 CREATE TABLE payments (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  order_id UUID NOT NULL REFERENCES orders(id) ON DELETE CASCADE,
+  order_id UUID NOT NULL,  -- reference to Order Service (no FK)
   razorpay_payment_id VARCHAR(128) UNIQUE,
+  payment_gateway VARCHAR(50) DEFAULT 'razorpay', -- for multi-gateway support
   amount BIGINT NOT NULL CHECK (amount > 0),
   currency CHAR(3) DEFAULT 'INR',
   status payment_status NOT NULL DEFAULT 'created',
@@ -56,26 +34,34 @@ CREATE TABLE payments (
   method_details JSONB DEFAULT '{}'::jsonb,
   capture BOOLEAN DEFAULT true,
   captured_at TIMESTAMPTZ,
+  payment_metadata JSONB DEFAULT '{}'::jsonb,
+  idempotency_key VARCHAR(255) REFERENCES idempotency_keys(key),
   created_at TIMESTAMPTZ DEFAULT now(),
-  updated_at TIMESTAMPTZ DEFAULT now(),
-  idempotency_key VARCHAR(255) REFERENCES idempotency_keys(key)
+  updated_at TIMESTAMPTZ DEFAULT now()
 );
+
+CREATE INDEX idx_payments_order_id ON payments(order_id);
+CREATE INDEX idx_payments_status ON payments(status);
 
 -- ================================
 -- REFUNDS
 -- ================================
 CREATE TABLE refunds (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  payment_id UUID NOT NULL REFERENCES payments(id) ON DELETE CASCADE,
+  payment_id UUID NOT NULL,  -- reference to payment
   razorpay_refund_id VARCHAR(128) UNIQUE,
   amount BIGINT NOT NULL CHECK (amount > 0),
   currency CHAR(3) DEFAULT 'INR',
   status refund_status NOT NULL DEFAULT 'created',
+  reason TEXT,
   failure_reason TEXT,
   metadata JSONB DEFAULT '{}'::jsonb,
   created_at TIMESTAMPTZ DEFAULT now(),
   updated_at TIMESTAMPTZ DEFAULT now()
 );
+
+CREATE INDEX idx_refunds_payment_id ON refunds(payment_id);
+CREATE INDEX idx_refunds_status ON refunds(status);
 
 -- ================================
 -- WEBHOOKS
@@ -90,25 +76,12 @@ CREATE TABLE webhooks (
   processed_at TIMESTAMPTZ,
   processing_error TEXT
 );
+
 CREATE INDEX idx_webhooks_event_type ON webhooks(event_type);
 CREATE INDEX idx_webhooks_processed ON webhooks(processed);
 
 -- ================================
--- IDEMPOTENCY KEYS
--- ================================
-CREATE TABLE idempotency_keys (
-  key TEXT PRIMARY KEY,
-  user_id UUID REFERENCES users(id),
-  request_path TEXT NOT NULL,
-  request_method TEXT NOT NULL,
-  response_status INT,
-  response_body JSONB,
-  created_at TIMESTAMPTZ DEFAULT now(),
-  expires_at TIMESTAMPTZ
-);
-
--- ================================
--- SETTLEMENTS
+-- SETTLEMENTS (Optional)
 -- ================================
 CREATE TABLE settlements (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -123,8 +96,10 @@ CREATE TABLE settlements (
   updated_at TIMESTAMPTZ DEFAULT now()
 );
 
+CREATE INDEX idx_settlements_status ON settlements(status);
+
 -- ================================
--- AUDIT LOGS
+-- AUDIT LOGS (Optional)
 -- ================================
 CREATE TABLE audit_logs (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -137,3 +112,6 @@ CREATE TABLE audit_logs (
   after_json JSONB,
   created_at TIMESTAMPTZ DEFAULT now()
 );
+
+CREATE INDEX idx_audit_logs_actor ON audit_logs(actor_type, actor_id);
+CREATE INDEX idx_audit_logs_action ON audit_logs(action);
