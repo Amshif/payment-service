@@ -12,6 +12,9 @@ SQLALCHEMY_DATABASE_URL = (
 engine = create_engine(
     SQLALCHEMY_DATABASE_URL,
     pool_pre_ping=True,      # auto-reconnect dropped connections
+    pool_size=10,
+    max_overflow=20,
+    pool_timeout=30,
     echo=False,              # set True for SQL logs
     future=True
 )
