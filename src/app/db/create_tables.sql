@@ -55,7 +55,7 @@ CREATE TABLE refunds (
   status refund_status NOT NULL DEFAULT 'created',
   reason TEXT,
   failure_reason TEXT,
-  metadata JSONB DEFAULT '{}'::jsonb,
+  refund_metadata JSONB DEFAULT '{}'::jsonb,
   created_at TIMESTAMPTZ DEFAULT now(),
   updated_at TIMESTAMPTZ DEFAULT now()
 );
