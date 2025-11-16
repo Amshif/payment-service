@@ -10,6 +10,7 @@ from starlette.exceptions import HTTPException as StarletteHTTPException
 from sqlalchemy.exc import SQLAlchemyError
 from app.api.v1.payments_router import router as payments_router
 from app.api.v1.refunds_router import router as refunds_router
+from app.api.v1.webhook_router import router as webhook_router
 
 
 
@@ -28,3 +29,4 @@ async def health_check():
 
 app.include_router(payments_router)
 app.include_router(refunds_router)
+app.include_router(webhook_router)
