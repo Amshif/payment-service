@@ -34,5 +34,15 @@ class PaymentRepository:
         self.db.flush()
         return payment
 
+    def update_status_by_razorpay_payment_id(
+        self, razorpay_id: str, status: PaymentStatus
+    ) -> Payment | None:
+        payment = self.get_by_razorpay_payment_id(razorpay_id)
+        if not payment:
+            return None
+        payment.status = status
+        self.db.flush()
+        return payment
+
     def get_by_idempotency_key(self, key: str) -> Payment | None:
         return self.db.query(Payment).filter(Payment.idempotency_key == key).first()
